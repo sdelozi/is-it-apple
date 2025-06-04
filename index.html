@@ -82,6 +82,15 @@
 </head>
 <body>
   <h1>Is It Apple?</h1>
+  <p>A fun game for Steph's bachelorette party! Guess the fruit!</p>
+
+  <!-- Audio Elements -->
+  <audio id="bg-music" loop>
+    <source src="audio/jazz-background.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <audio id="narration"></audio>
 
   <!-- Setup Screen -->
   <section id="setup">
@@ -128,15 +137,6 @@
   </section>
 
   <script>
-    /* -------------------------------------------
-       CONFIGURATION
-       -------------------------------------------
-       ➜ Replace the placeholder image file names with your real files.
-       ➜ All media paths are relative to this HTML file. Suggested folder layout:
-         /is-it-scott.html
-         /images/headshots/*.jpg
-         /images/bodyparts/*.jpg
-    */
     const groomsmen = [
       {
         name: "Apple",
@@ -197,6 +197,9 @@
     const nextBtn      = document.getElementById("next-btn");
     const scoreTable   = document.getElementById("scores-table");
 
+    const bgMusic = document.getElementById('bg-music');
+    const narration = document.getElementById('narration');
+
     // Utility: random choice from array
     const rand = arr => arr[Math.floor(Math.random() * arr.length)];
 
@@ -204,6 +207,13 @@
        INITIALISATION
     ------------------------------------------- */
     document.getElementById("start-btn").addEventListener("click", () => {
+      try {
+        bgMusic.volume = 0.3;
+        bgMusic.play();
+      } catch (e) {
+        console.warn("Autoplay blocked: user must interact with page.");
+      }
+
       const raw = document.getElementById("player-input").value;
       players = raw.split(/,|\n/).map(s => s.trim()).filter(Boolean);
       if (!players.length) return alert("Please enter at least one player name 🤗");
@@ -335,13 +345,15 @@
       document.getElementById("winner-text").textContent = `Congratulations to the winner${winners.length > 1 ? 's' : ''}: ${names}!`;
     }
 
-    // Check for game over at the end of each round
-    function maybeEndGame(remainingImages, players) {
-      if (remainingImages.length === 0) {
-        showGameOver(players);
-        return true;
-      }
-      return false;
+    function playNarration(src) {
+      narration.src = src;
+      narration.volume = 1.0;
+      narration.play();
+      bgMusic.volume = 0.1;
+
+      narration.onended = () => {
+        bgMusic.volume = 0.3;
+      };
     }
   </script>
 </body>
