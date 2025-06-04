@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Is It Scott? – Bachelorette Party Game</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+    body { background: #f9fafb; margin: 0; padding: 2rem; display: flex; flex-direction: column; align-items: center; }
+    h1, h2 { margin: 0.5rem 0; }
+    button { cursor: pointer; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; background: #4f46e5; color: #fff; font-size: 1rem; transition: 0.2s; }
+    button:hover { background: #4338ca; }
+    img { max-width: 100%; height: auto; border-radius: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    #game-wrapper { display: none; width: 100%; max-width: 900px; }
+    #round-img { width: 100%; max-height: 360px; object-fit: contain; background: #fff; }
+    #guess-area div { margin: 0.25rem 0; }
+    select { padding: 0.25rem; border-radius: 0.25rem; }
+    #leaderboard { margin-top: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.5rem; text-align: left; }
+    tr:nth-child(even) { background: #eef2ff; }
+  </style>
+</head>
+<body>
+  <h1>Is It Apple?</h1>
+  <!-- Setup Screen -->
+  <section id="setup">
+    <p>Type each player's name, separated by commas, then press <strong>Start Game</strong>.</p>
+    <input id="player-input" type="text" placeholder="e.g. Anna,Beth,Carla" style="width:100%;padding:0.5rem;margin-bottom:0.5rem;border:1px solid #d1d5db;border-radius:0.5rem;" />
+    <button id="start-btn">Start Game</button>
+  </section>
+
+  <!-- Game Screen -->
+  <section id="game-wrapper">
+    <h2 id="round-label"></h2>
+    <img id="round-img" src="" alt="Body part to guess" />
+
+    <form id="guess-area"></form>
+
+    <button id="submit-btn" type="button">Submit Guesses</button>
+
+    <section id="reveal" style="display:none; margin-top:1rem;">
+      <h2 id="answer-heading"></h2>
+      <img id="headshot-img" src="" alt="Headshot" style="max-height:300px;" />
+      <div style="margin-top:0.75rem;">
+        <button id="next-btn" type="button">Next Round</button>
+      </div>
+    </section>
+
+    <section id="leaderboard">
+      <h2>Leaderboard</h2>
+      <table id="scores-table"></table>
+    </section>
+  </section>
+
+  <script>
+    /* -------------------------------------------
+       CONFIGURATION
+       -------------------------------------------
+       ➜ Replace the placeholder image file names with your real files.
+       ➜ All media paths are relative to this HTML file. Suggested folder layout:
+         /is-it-scott.html
+         /images/headshots/*.jpg
+         /images/bodyparts/*.jpg
+    */
+    const groomsmen = [
+      {
+        name: "Apple",
+        headshot: "images/headshots/apple.jpg",
+        parts: [
+          "images/bodyparts/apple_core.jpg",
+          "images/bodyparts/apple_skin.jpg",
+          "images/bodyparts/apple_stem.jpg"
+        ]
+      },
+      {
+        name: "Grapes",
+        headshot: "images/headshots/grapes.jpg",
+        parts: [
+          "images/bodyparts/grape_skin.jpg",
+          "images/bodyparts/grape_stem.jpg",
+          "images/bodyparts/grape_translucent.jpg"
+        ]
+      },
+      {
+        name: "Orange",
+        headshot: "images/headshots/orange.jpg",
+        parts: [
+          "images/bodyparts/orange_core.jpg",
+          "images/bodyparts/orange_grain.jpg",
+          "images/bodyparts/orange_skin.jpg"
+        ]
+      },
+      {
+        name: "Peach",
+        headshot: "images/headshots/peach.jpg",
+        parts: [
+          "images/bodyparts/peach_core.jpg",
+          "images/bodyparts/peach_leaf.jpg",
+          "images/bodyparts/peach_skin.jpg"
+        ]
+      }
+    ];
+
+    /* -------------------------------------------
+       STATE & HELPERS
+    ------------------------------------------- */
+    let players = [];        // array of player names
+    let scores = {};         // { playerName: points }
+    let roundNumber = 0;     // increments each round
+    let currentGroom = null; // groomsman object for the active round
+    let imagePool = []; // all available body part images
+
+    const setupSection = document.getElementById("setup");
+    const gameSection  = document.getElementById("game-wrapper");
+    const roundImg     = document.getElementById("round-img");
+    const roundLabel   = document.getElementById("round-label");
+    const guessArea    = document.getElementById("guess-area");
+    const submitBtn    = document.getElementById("submit-btn");
+    const revealBox    = document.getElementById("reveal");
+    const answerHeading= document.getElementById("answer-heading");
+    const headshotImg  = document.getElementById("headshot-img");
+    const nextBtn      = document.getElementById("next-btn");
+    const scoreTable   = document.getElementById("scores-table");
+
+    // Utility: random choice from array
+    const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+
+    /* -------------------------------------------
+       INITIALISATION
+    ------------------------------------------- */
+    document.getElementById("start-btn").addEventListener("click", () => {
+      const raw = document.getElementById("player-input").value;
+      players = raw.split(/,|\n/).map(s => s.trim()).filter(Boolean);
+      if (!players.length) return alert("Please enter at least one player name 🤗");
+
+      // reset state
+      scores = Object.fromEntries(players.map(p => [p, 0]));
+      roundNumber = 0;
+
+      // switch screens
+      setupSection.style.display = "none";
+      gameSection.style.display  = "block";
+
+      // Build initial image pool (one entry per body part)
+      imagePool = [];
+      groomsmen.forEach(groom => {
+        groom.parts.forEach(part => {
+          imagePool.push({
+            groomName: groom.name,
+            headshot: groom.headshot,
+            imagePath: part
+          });
+        });
+      });
+
+      nextRound();
+    });
+
+    /* -------------------------------------------
+       GAME FLOW
+    ------------------------------------------- */
+    function nextRound() {
+      roundNumber++;
+      revealBox.style.display = "none";
+      submitBtn.disabled = false;
+
+      if (imagePool.length === 0) {
+        alert("No more body parts to show!");
+        return;
+      }
+
+      // Pick and remove a random image from the pool
+      const index = Math.floor(Math.random() * imagePool.length);
+      const entry = imagePool.splice(index, 1)[0]; // remove from pool
+
+      currentGroom = { name: entry.groomName, headshot: entry.headshot };
+      const bodyPartPath = entry.imagePath;
+
+      roundLabel.textContent = `Round ${roundNumber}`;
+      roundImg.src = bodyPartPath;
+
+      guessArea.innerHTML = "";
+      players.forEach(player => {
+        const wrapper = document.createElement("div");
+        const select  = document.createElement("select");
+        select.name   = player;
+        groomsmen.forEach(g => {
+          const opt = document.createElement("option");
+          opt.value = g.name;
+          opt.textContent = g.name;
+          select.appendChild(opt);
+        });
+        wrapper.innerHTML = `<strong>${player}</strong>: `;
+        wrapper.appendChild(select);
+        guessArea.appendChild(wrapper);
+      });
+    }
+
+    submitBtn.addEventListener("click", () => {
+      players.forEach(player => {
+        const guess = guessArea.querySelector(`select[name='${player}']`).value;
+        const correctName = currentGroom.name;
+
+        if (correctName === "Apple") {
+          scores[player] += (guess === "Apple") ? 2 : 0;
+        } else {
+          if (guess === correctName) {
+            scores[player] += 2;
+          } else if (guess !== "Apple") {
+            scores[player] += 1;
+          } else {
+            scores[player] += 0;
+          }
+        }
+      });
+
+      // update leaderboard
+      updateLeaderboard();
+
+      // reveal answer
+      answerHeading.textContent = `It was ${currentGroom.name}!`;
+      headshotImg.src = currentGroom.headshot;
+      revealBox.style.display = "block";
+      submitBtn.disabled = true;
+    });
+
+    nextBtn.addEventListener("click", nextRound);
+
+    function updateLeaderboard() {
+      const rows = Object.entries(scores)
+        .sort(([,a],[,b]) => b - a)
+        .map(([name,pts]) => `<tr><td>${name}</td><td>${pts}</td></tr>`)
+        .join("");
+      scoreTable.innerHTML = `<tr><th>Player</th><th>Points</th></tr>${rows}`;
+    }
+  </script>
+</body>
+</html>
