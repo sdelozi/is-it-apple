@@ -136,6 +136,17 @@
     <p id="winner-text"></p>
   </section>
 
+  <!-- Dimming Overlay -->
+  <div id="overlay" style="
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 1000;
+  "></div>
+
   <script>
     const groomsmen = [
       {
@@ -196,6 +207,7 @@
     const headshotImg  = document.getElementById("headshot-img");
     const nextBtn      = document.getElementById("next-btn");
     const scoreTable   = document.getElementById("scores-table");
+    const overlay = document.getElementById('overlay');
 
     const bgMusic = document.getElementById('bg-music');
     const narration = document.getElementById('narration');
@@ -210,35 +222,45 @@
       try {
         bgMusic.volume = 0.3;
         bgMusic.play();
+
+        const raw = document.getElementById("player-input").value;
+        players = raw.split(/,|\n/).map(s => s.trim()).filter(Boolean);
+        if (!players.length) return alert("Please enter at least one player name 🤗");
+
+        // reset state
+        scores = Object.fromEntries(players.map(p => [p, 0]));
+        roundNumber = 0;
+
+        overlay.style.pointerEvents = "auto"; // Optionally block clicks while dimmed
+        overlay.style.opacity = "1";           // Fade in (dim)
+
+        // Play narration first, then show game UI and start round
+        playNarration('audio/narration_intro.mp3', () => {
+          overlay.style.opacity = "0";         // Fade out (undim)
+          overlay.style.pointerEvents = "none";
+
+          // switch screens AFTER narration
+          setupSection.style.display = "none";
+          gameSection.style.display = "block";
+
+          // Build initial image pool (one entry per body part)
+          imagePool = [];
+          groomsmen.forEach(groom => {
+            groom.parts.forEach(part => {
+              imagePool.push({
+                groomName: groom.name,
+                headshot: groom.headshot,
+                imagePath: part
+              });
+            });
+          });
+
+          nextRound();
+        });
+
       } catch (e) {
         console.warn("Autoplay blocked: user must interact with page.");
       }
-
-      const raw = document.getElementById("player-input").value;
-      players = raw.split(/,|\n/).map(s => s.trim()).filter(Boolean);
-      if (!players.length) return alert("Please enter at least one player name 🤗");
-
-      // reset state
-      scores = Object.fromEntries(players.map(p => [p, 0]));
-      roundNumber = 0;
-
-      // switch screens
-      setupSection.style.display = "none";
-      gameSection.style.display  = "block";
-
-      // Build initial image pool (one entry per body part)
-      imagePool = [];
-      groomsmen.forEach(groom => {
-        groom.parts.forEach(part => {
-          imagePool.push({
-            groomName: groom.name,
-            headshot: groom.headshot,
-            imagePath: part
-          });
-        });
-      });
-
-      nextRound();
     });
 
     /* -------------------------------------------
@@ -345,7 +367,7 @@
       document.getElementById("winner-text").textContent = `Congratulations to the winner${winners.length > 1 ? 's' : ''}: ${names}!`;
     }
 
-    function playNarration(src) {
+    function playNarration(src, onComplete) {
       narration.src = src;
       narration.volume = 1.0;
       narration.play();
@@ -353,6 +375,7 @@
 
       narration.onended = () => {
         bgMusic.volume = 0.3;
+        if (onComplete) onComplete();
       };
     }
   </script>

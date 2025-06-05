@@ -2,7 +2,7 @@
 
 ## v0.0.1
 [Improvements] Initial demo
-- Added files for initial testing with MOH
+- Added files for initial user testing with MOH
 
 ## v0.0.2
 [Improvements] GitHub Pages
@@ -16,3 +16,7 @@
 ## v0.1.0
 [Improvements] Audio
 - Background Music
+
+## v0.1.1
+[Improvements] Narration
+- Intro narration and pause before game start
